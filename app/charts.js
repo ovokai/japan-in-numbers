@@ -47,7 +47,29 @@ export function lineChart(series, opts) {
       out += '<circle cx="' + X(p.x).toFixed(1) + '" cy="' + Y(p.y).toFixed(1) + '" r="3.2" fill="#fff" stroke="' + s.color + '" stroke-width="2"/>';
     });
   });
-  series[0].points.forEach((p) => {
+  // X labels: draw only labels that cannot overlap. Estimate each label's
+  // pixel width from its text, keep a running right edge, and always keep
+  // the last point's label (dropping the previous one if it would collide).
+  const labelW = (s) => String(s).length * 6.6 + 4;
+  const pts = series[0].points;
+  const keep = [];
+  let lastRight = -Infinity;
+  pts.forEach((p, i) => {
+    const halfW = labelW(p.x) / 2;
+    if (X(p.x) - halfW >= lastRight) {
+      keep.push(i);
+      lastRight = X(p.x) + halfW;
+    }
+  });
+  const lastIdx = pts.length - 1;
+  if (keep[keep.length - 1] !== lastIdx) {
+    if (keep.length && X(pts[keep[keep.length - 1]].x) + labelW(pts[keep[keep.length - 1]].x) / 2 > X(pts[lastIdx].x) - labelW(pts[lastIdx].x) / 2) {
+      keep.pop();
+    }
+    keep.push(lastIdx);
+  }
+  keep.forEach((i) => {
+    const p = pts[i];
     out += '<text x="' + X(p.x).toFixed(1) + '" y="' + (o.height - 8) + '" text-anchor="middle" font-size="11" fill="#64748b">' + p.x + '</text>';
   });
   if (series.length > 1) {
@@ -92,7 +114,7 @@ export function barChart(items, opts) {
 // Population pyramid. rows: [{band, men, women}] in millions.
 export function pyramid(rows, opts) {
   const o = Object.assign({ width: 640, height: 360 }, opts || {});
-  const padL = 70, padR = 70, padT = 26, padB = 26;
+  const padL = 76, padR = 70, padT = 26, padB = 26;
   const w = o.width - padL - padR, h = o.height - padT - padB;
   const maxV = Math.max.apply(null, rows.map((r) => Math.max(r.men, r.women))) || 1;
   const half = w / 2, mid = padL + half;
@@ -107,7 +129,10 @@ export function pyramid(rows, opts) {
     const ww = (r.women / maxV) * half;
     out += '<rect x="' + (mid - mw).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + mw.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="#1d4ed8"/>';
     out += '<rect x="' + mid.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + ww.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="#be123c"/>';
-    out += '<text x="' + (mid - 8) + '" y="' + (y + bh / 2 + 4).toFixed(1) + '" text-anchor="end" font-size="11" fill="#334155">' + esc(r.band) + '</text>';
+    // Age-band label in a dedicated column at the left, clear of the bars:
+    // it ends at padL - 32, while the leftmost men's value label starts
+    // around padL - 23, so the two can never meet.
+    out += '<text x="' + (padL - 32) + '" y="' + (y + bh / 2 + 4).toFixed(1) + '" text-anchor="end" font-size="11" fill="#334155">' + esc(r.band) + '</text>';
     out += '<text x="' + (mid - mw - 5).toFixed(1) + '" y="' + (y + bh / 2 + 4).toFixed(1) + '" text-anchor="end" font-size="10" fill="#64748b">' + r.men.toFixed(1) + '</text>';
     out += '<text x="' + (mid + ww + 5).toFixed(1) + '" y="' + (y + bh / 2 + 4).toFixed(1) + '" font-size="10" fill="#64748b">' + r.women.toFixed(1) + '</text>';
   });
